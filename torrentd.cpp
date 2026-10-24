@@ -245,7 +245,7 @@ int main(int argc, char* argv[])
 				for (std::vector<torrent_status>::iterator i = p->status.begin();
 						i != p->status.end(); ++i) {
 					auto torrentInfo = i->torrent_file.lock();
-					if(!torrentInfo->is_valid()) {
+					if(!torrentInfo || !torrentInfo->is_valid()) {
 						std::cerr << "Torrent not valid yet" << std::endl;
 						continue;
 					}
@@ -268,6 +268,10 @@ int main(int argc, char* argv[])
 						std::cout << std::endl;
 						std::cerr << "More than one file, which one to take ?" << std::endl;
 						std::cin >> fileId;
+						if (!std::cin || fileId < 0 || fileId >= files.num_files()) {
+							std::cerr << "Invalid file selection" << std::endl;
+							return 1;
+						}
 						const file_index_t selectedFile{fileId};
 
 						infos.pieceLength = torrentInfo->piece_length();
