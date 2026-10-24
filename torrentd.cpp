@@ -26,6 +26,7 @@
 #include "libtorrent/bencode.hpp"
 #include "libtorrent/entry.hpp"
 #include "libtorrent/magnet_uri.hpp"
+#include "libtorrent/load_torrent.hpp"
 #include "libtorrent/session.hpp"
 #include "libtorrent/time.hpp"
 #include "libtorrent/torrent_info.hpp"
@@ -175,25 +176,23 @@ static void load_blocklist(char *path) {
 	fclose(filter);
 }
 
-static void add_torrent(const char* torrent) {
+static bool add_torrent(const char* torrent) {
 	error_code ec;
 	add_torrent_params p;
-	p.save_path = "./";
-
-    //This one is if "torrent" is a local file
-	p.ti.reset(new torrent_info(torrent, ec));
-
-    //if it failed then try other things
-	if(ec) {
-		p.ti = nullptr;
-        //Ask to parse it as http:// <DEPRECATED>
-		p.url = torrent;
-
-		//Try to parse it as a magnet
+	if (strncmp(torrent, "magnet:", 7) == 0) {
 		parse_magnet_uri(torrent, p, ec);
+	} else {
+		// Nova downloads remote .torrent files before starting this process.
+		// Load the complete parameters, including trackers and web seeds.
+		p = load_torrent_file(torrent, ec, {});
 	}
-
+	if (ec) {
+		std::cerr << "Failed to load torrent: " << ec.message() << std::endl;
+		return false;
+	}
+	p.save_path = "./";
 	s()->async_add_torrent(p);
+	return true;
 }
 
 int main(int argc, char* argv[])
@@ -215,7 +214,8 @@ int main(int argc, char* argv[])
 
 	load_blocklist(argv[2]);
 
-	add_torrent(argv[1]);
+	if (!add_torrent(argv[1]))
+		return 1;
 
 	int fileId = -1;
 
@@ -259,26 +259,28 @@ int main(int argc, char* argv[])
 					// - Find fileId
 					// - Retrieve static torrent infos
 					if(fileId == -1) {
-						auto files = torrentInfo->files();
+						auto renames = hdl.get_renamed_files();
+						filenames files{torrentInfo->layout(), renames};
 						for(int j=0; j<files.num_files(); ++j) {
-							std::cout << files.file_path(j) << std::endl;
+							std::cout << files.file_path(file_index_t{j}) << std::endl;
 						}
 						//Empty line to mark end of list
 						std::cout << std::endl;
 						std::cerr << "More than one file, which one to take ?" << std::endl;
 						std::cin >> fileId;
+						const file_index_t selectedFile{fileId};
 
 						infos.pieceLength = torrentInfo->piece_length();
 						infos.nTotalPieces = torrentInfo->num_pieces();
 
-						infos.offset = files.file_offset(fileId);
-						infos.nPieces = (files.file_size(fileId) + infos.pieceLength - 1)/infos.pieceLength;
+						infos.offset = files.file_offset(selectedFile);
+						infos.nPieces = (files.file_size(selectedFile) + infos.pieceLength - 1)/infos.pieceLength;
 						infos.firstPiece = infos.offset/infos.pieceLength;
-						infos.fileSize = files.file_size(fileId);
+						infos.fileSize = files.file_size(selectedFile);
 						infos.lastPiece = (infos.offset + infos.fileSize)/infos.pieceLength;
-						infos.path = strdup(files.file_path(fileId).c_str());
+						infos.path = strdup(files.file_path(selectedFile).c_str());
 
-						auto trackers = torrentInfo->trackers();
+						auto trackers = hdl.trackers();
 						infos.nTrackers = trackers.size();
 					}
 

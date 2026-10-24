@@ -25,7 +25,11 @@ LOCAL_MODULE:= torrentd
 
 LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/boost/boost-1.92.0
 LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/libtorrent-android-builder/libtorrent/include
-LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/boost/boost-1.92.0-$(TARGET_ARCH_ABI)/torrent/clang-$(os)-android/release/cxxstd-14-iso/link-static/target-os-android/threading-multi/visibility-hidden/libtorrent-rasterbar.a
+LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/prebuilt/openssl/dist-$(TARGET_ARCH_ABI)/include
+# Match the feature definitions used by libtorrent's Boost.Build invocation.
+LOCAL_CPPFLAGS += -DTORRENT_USE_OPENSSL -DTORRENT_USE_LIBCRYPTO -DTORRENT_SSL_PEERS
+LOCAL_CPPFLAGS += -DTORRENT_USE_RTC=0 -D_FILE_OFFSET_BITS=64
+LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/boost/boost-1.92.0-$(TARGET_ARCH_ABI)/torrent/clang-$(os)-android/release/cxxstd-17-iso/link-static/target-os-android/threading-multi/visibility-hidden/webtorrent-off/libtorrent-rasterbar.a
 LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/prebuilt/openssl/dist-$(TARGET_ARCH_ABI)/lib/libssl.a
 LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/prebuilt/openssl/dist-$(TARGET_ARCH_ABI)/lib/libcrypto.a
 
@@ -34,7 +38,7 @@ LOCAL_LDLIBS += -latomic
 LOCAL_CPPFLAGS += -fexceptions
 LOCAL_CPPFLAGS += -frtti
 
-LOCAL_CXXFLAGS += -std=c++14
+LOCAL_CPPFLAGS += -std=c++17
 
 # Add 16KB page size alignment support for Android 15+
 LOCAL_LDFLAGS += -Wl,-z,max-page-size=16384
